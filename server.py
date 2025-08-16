@@ -2,68 +2,43 @@ from flask import Flask, request, jsonify
 import camelot
 import pandas as pd
 import json
-import re # Import the regular expressions library
+import re
 
 app = Flask(__name__)
 
+# (Helper functions like is_likely_quantity and post_process_table remain the same)
 def is_likely_quantity(s):
-    """
-    Helper function to check if a string is likely a quantity (a number).
-    This helps us identify the last column of a valid row.
-    """
     if s is None:
         return False
-    # Remove commas, periods, etc., then check if the string is all digits.
     return re.sub(r'[\.,]', '', str(s).strip()).isdigit()
 
 def post_process_table(df):
-    """
-    This is the core logic to fix broken rows caused by text wrapping.
-    """
     processed_rows = []
     temp_row = []
     num_columns = len(df.columns)
-
-    # Convert the DataFrame to a list of lists for easier processing
     data = df.values.tolist()
-
     i = 0
     while i < len(data):
         row = data[i]
-        
-        # A "complete" row is one that has content and likely ends with a quantity.
-        # We check the last non-empty cell.
         last_cell_content = next((cell for cell in reversed(row) if str(cell).strip()), None)
-
-        # If the temporary row is empty, we start a new one.
         if not temp_row:
             temp_row.extend(row)
         else:
-            # If the current row is incomplete, merge it with the temporary row.
-            # An "incomplete" row is one that doesn't seem to end with a quantity.
             if not is_likely_quantity(last_cell_content):
-                # Merge by combining elements column by column
                 for j in range(num_columns):
                     temp_row[j] = f"{temp_row[j]} {row[j]}".strip()
             else:
-                # The temporary row was complete, so we save it and start a new one.
                 processed_rows.append(temp_row)
                 temp_row = list(row)
         
-        # Check if the temporary row is now "complete"
         last_temp_cell = next((cell for cell in reversed(temp_row) if str(cell).strip()), None)
         if is_likely_quantity(last_temp_cell):
             processed_rows.append(temp_row)
             temp_row = []
-
         i += 1
-    
-    # Add the last temporary row if it exists
     if temp_row:
         processed_rows.append(temp_row)
-
     return processed_rows
-
 
 @app.route('/extract_table', methods=['POST'])
 def extract_table():
@@ -72,6 +47,8 @@ def extract_table():
 
     file = request.files['file']
     flavor = request.form.get('flavor', 'stream')
+    # Get the column separators from the request, if provided
+    columns_str = request.form.get('columns')
 
     if file.filename == '':
         return jsonify({"error": "No selected file"}), 400
@@ -81,29 +58,36 @@ def extract_table():
             filepath = "temp.pdf"
             file.save(filepath)
 
-            print(f"Processing with flavor: {flavor}")
-            tables = camelot.read_pdf(filepath, flavor=flavor, pages='1-end')
+            # Prepare keyword arguments for Camelot
+            camelot_kwargs = {'flavor': flavor, 'pages': '1-end'}
+
+            # If column separators were provided, add them to the arguments
+            if columns_str:
+                try:
+                    # Convert the comma-separated string to a list of integers
+                    columns = [int(c.strip()) for c in columns_str.split(',')]
+                    camelot_kwargs['column_separators'] = columns
+                    print(f"Using custom column separators: {columns}")
+                except ValueError:
+                    return jsonify({"error": "Invalid format for columns. Must be comma-separated numbers."}), 400
+
+            tables = camelot.read_pdf(filepath, **camelot_kwargs)
 
             if len(tables) > 0:
                 all_tables_data = []
                 for table in tables:
-                    # If using stream, apply our advanced post-processing logic
                     if flavor == 'stream':
-                        print("Applying post-processing for stream flavor...")
                         processed_data = post_process_table(table.df)
                         all_tables_data.extend(processed_data)
                     else:
-                        # For 'lattice', the structure is usually correct, so we just add it
                         all_tables_data.extend(table.df.values.tolist())
-                    
-                    all_tables_data.append([]) # Add a blank row for spacing
+                    all_tables_data.append([])
 
                 return jsonify(all_tables_data), 200
             else:
                 return jsonify([]), 200
 
         except Exception as e:
-            print(f"An error occurred: {e}")
             return jsonify({"error": str(e)}), 500
     
     return jsonify({"error": "Invalid file type"}), 400
