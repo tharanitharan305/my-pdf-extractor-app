@@ -7,7 +7,7 @@ WORKDIR /app
 # Install system dependencies needed for tabula-py
 # Use a multi-line command for clarity and to ensure all steps run in one layer
 RUN apt-get update \
-    && apt-get install -y openjdk-11-jre \
+    && apt-get install -y openjdk-11-jre-headless \
     # Clean up apt cache to keep the image size small
     && rm -rf /var/lib/apt/lists/*
 
