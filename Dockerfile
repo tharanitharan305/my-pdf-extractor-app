@@ -1,14 +1,15 @@
 # Use an official Python runtime as a parent image
 FROM python:3.9-slim
 
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+
 # Set the working directory in the container
 WORKDIR /app
 
 # Install system dependencies needed for tabula-py
-# Use a multi-line command for clarity and to ensure all steps run in one layer
 RUN apt-get update \
     && apt-get install -y openjdk-11-jre-headless \
-    # Clean up apt cache to keep the image size small
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the requirements file into the working directory
