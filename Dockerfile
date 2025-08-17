@@ -5,8 +5,10 @@ FROM python:3.9-slim
 WORKDIR /app
 
 # Install system dependencies needed for tabula-py
-RUN apt-get update && apt-get install -y \
-    openjdk-11-jre \
+# Use a multi-line command for clarity and to ensure all steps run in one layer
+RUN apt-get update \
+    && apt-get install -y openjdk-11-jre \
+    # Clean up apt cache to keep the image size small
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the requirements file into the working directory
@@ -23,4 +25,3 @@ EXPOSE 5000
 
 # Run the app
 CMD ["python", "server.py"]
-
