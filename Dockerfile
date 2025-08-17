@@ -1,22 +1,25 @@
-# Start with a standard Python 3.9 image
+# Use an official Python runtime as a parent image
 FROM python:3.9-slim
 
-# Install system dependencies needed by Camelot
-RUN apt-get update && apt-get install -y \
-    ghostscript \
-    tk \
-    --no-install-recommends && \
-    rm -rf /var/lib/apt/lists/*
-
-# Set the working directory inside the container
+# Set the working directory in the container
 WORKDIR /app
 
-# Copy the requirements file and install Python packages
+# Install system dependencies needed for tabula-py
+RUN apt-get update && apt-get install -y \
+    openjdk-11-jre \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the requirements file into the working directory
 COPY requirements.txt .
+
+# Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy your server code into the container
-COPY server.py .
+# Copy the Python script into the container
+COPY python_server.py .
 
-# Tell the container to run your Flask server when it starts
+# Expose the port the app runs on
+EXPOSE 5000
+
+# Run the app
 CMD ["python", "server.py"]
