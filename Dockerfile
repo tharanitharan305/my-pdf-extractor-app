@@ -9,7 +9,7 @@ WORKDIR /app
 
 # Install system dependencies needed for tabula-py
 RUN apt-get update \
-    && apt-get install -y openjdk-11-jre-headless \
+    && apt-get install -y default-jre-headless \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the requirements file into the working directory
